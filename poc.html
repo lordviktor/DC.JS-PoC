@@ -1,0 +1,160 @@
+<html>
+	<head>
+	    <meta charset="UTF-8">
+	    <title>PoC Charts</title>
+
+		<script type="text/javascript" src="js/d3.js"></script>
+		<script type="text/javascript" src="js/crossfilter.js"></script>
+		<script type="text/javascript" src="js/dc.js"></script>
+		<script type="text/javascript" src="js/jquery.js"></script>
+		<script type="text/javascript" src="js/bootstrap.min.js"></script>
+		
+	    <link href='css/bootstrap.min.css' rel='stylesheet' type='text/css'>
+		<link href='css/dc.css' rel='stylesheet' type='text/css'>
+	</head>
+	<body>
+
+		<div class='container' style='font: 12px sans-serif;'>
+			<div class='row'>
+				<div class='row'>
+					<div class='span6' id='dc-authentication-origin'>
+						<h4>Authentication by origin</h4>
+					</div>
+					<div class='span6' id='dc-whitelist'>
+						<h4>Whitelist</h4>
+					</div>
+				</div>
+				<div class="row">
+					<div class="span12" id="dc-authenticationDate">
+						<h4>Authentications by date</h4>
+					</div>
+				</div>
+				<div class='span12'>
+					<table id='data-table' class='table table-hover'>
+						<thead>
+							<tr class="header">
+								<th>authenticationDate</th>
+								<th>Whitelist</th>
+								<th>authenticationOrigin</th>
+								<th>authenticationNumber</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+			</div>
+		</div>
+
+		<script type="text/javascript">
+
+			var data = [
+				{ authenticationDate:new Date(2013, 09, 10), whitelist:true, authenticationOrigin:'APP', 
+					authenticationNumber:15  },
+				{ authenticationDate:new Date(2013, 09, 10), whitelist:false, authenticationOrigin:'GRUDA',
+					authenticationNumber:10 },
+				{ authenticationDate:new Date(2013, 09, 11), whitelist:true, authenticationOrigin:'GRUDA',
+					authenticationNumber:11 },
+				{ authenticationDate:new Date(2013, 09, 11), whitelist:false, authenticationOrigin:'APP',
+					authenticationNumber:7 }
+			];
+
+			var facts = crossfilter(data);
+
+			// define a dimension
+			var timeDimension = facts.dimension(function(d) {
+				return d3.time.day(d.authenticationDate); 
+			});
+		
+			var dataTable = dc.dataTable("#data-table");
+			var authenticationByOrigin = dc.rowChart("#dc-authentication-origin");
+			var whitelist = dc.pieChart("#dc-whitelist");
+			var authenticationByDate = dc.barChart("#dc-authenticationDate");
+
+			dataTable.width(960).height(800)
+				.dimension(timeDimension)
+					.group(function(d) { return "Autenticações por dia" })
+					.size(10)
+				.columns([
+					function(d) { return d.authenticationDate; },
+					function(d) { return d.whitelist; },
+					function(d) { return d.authenticationOrigin; },
+					function(d) { return d.authenticationNumber; }
+				])
+				.sortBy(function(d){ return d.authenticationDate; })
+				.order(d3.ascending);
+
+			var authenticationTypeDimension = facts.dimension(function(d){
+				return d.authenticationOrigin;
+			});
+
+			var authenticationTypeGroupSum = authenticationTypeDimension.group().reduceSum(function(d){
+				return d.authenticationNumber;
+			});
+
+			authenticationByOrigin.width(300)
+				.height(220)
+				.margins({top: 5, left: 10, right: 10, bottom: 20})
+				.dimension(authenticationTypeDimension)
+				.group(authenticationTypeGroupSum)
+				.colors(d3.scale.category10())
+				.label(function (d){
+					return d.key;
+				})
+				.title(function(d){
+					return d.authenticationNumber;
+				})
+				.elasticX(true)
+				.xAxis().ticks(4);
+
+		
+			var whitelistDimension = facts.dimension(function(d){
+				if(d.whitelist)
+					return "Whitelist";
+				else
+					return "Não Whitelist";
+			});
+
+			var whitelistGroupSum = whitelistDimension.group().reduceSum(function(d){
+				return d.authenticationNumber;
+			});
+
+			whitelist.width(250)
+				.height(220)
+				.radius(100)
+				.dimension(whitelistDimension)
+				.group(whitelistGroupSum)
+				.title(function(d)
+					{
+						return d.data.value;
+					}
+				);
+
+			var authenticationDateDimension = facts.dimension(function(d){
+				return d3.time.day(d.authenticationDate);
+			});
+
+
+			var authenticationDateAuthenticationNumberGroup = authenticationDateDimension.group()
+				.reduceSum(function(d){
+					return d.authenticationNumber;
+			});
+
+			authenticationByDate.width(900)
+				.height(150)
+				.margins({top: 10, right: 10, bottom: 20, left: 40})
+				.dimension(authenticationDateDimension)
+				.group(authenticationDateAuthenticationNumberGroup)
+				.transitionDuration(500)
+				.centerBar(true)
+				.gap(0)
+				.x(d3.time.scale().domain([new Date(2013, 09, 1), new Date(2013, 09, 31)]))
+				//.elasticY(true)
+				.renderHorizontalGridLines(true)
+    			.xUnits(d3.time.days)
+				// .round(d3.time.month.round)
+				// .xAxis().tickFormat();
+
+			// Render the Charts
+			dc.renderAll();
+		</script>
+	</body>
+</html>
